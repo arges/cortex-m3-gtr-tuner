@@ -3,14 +3,15 @@
  */
 
 /* a circular queue implementation */
-#define SIZE	128
+#define SIZE	(1<<POWER)
 #define MAX	SIZE-1
 struct queue {
-	int buffer[SIZE];
+	short int buffer[SIZE];
 	int head;
 	int tail;
 };
 
+#if 0
 /* print queue */
 static inline void print_queue(struct queue *q) {
 	int i = 0;
@@ -20,6 +21,7 @@ static inline void print_queue(struct queue *q) {
 	}
 	printf("\n");
 }
+#endif
 
 /* initialize a pointer a new queue */
 static inline void init_queue(struct queue *q) {

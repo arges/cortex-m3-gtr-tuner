@@ -3,26 +3,21 @@
  *
  */
 
-#define MAX_WIDTH	128
-#define MAX_HEIGHT	96
-#define NUM_PIXELS	MAX_WIDTH*MAX_HEIGHT/2
-
 /* return 0 if OK, -1 if bad */
 static inline int check_bounds(short x, short y) {
-	if ((x > MAX_WIDTH-1) || (x < 0) || (y > MAX_HEIGHT-1) || (y < 0))
+	if ((x > WIDTH-1) || (x < 0) || (y > HEIGHT-1) || (y < 0))
 		return -1;
 
 	return 0;
 }
 
-/* draw a single pixel
- * valid ranges are x: 0-127, y: 0-95 */
-void set_pixel(unsigned char *buffer, short x, short y, short val) {
+/* draw a single pixel */
+static inline void set_pixel(unsigned char *buffer, short x, short y, short val) {
 	/* check bounds */
 	if (check_bounds(x,y))
 		return;
 
-	int pos = y*MAX_WIDTH + x;
+	int pos = y*WIDTH + x;
  	if (pos % 2)
 		buffer[pos/2] = val;
 	else
@@ -31,7 +26,7 @@ void set_pixel(unsigned char *buffer, short x, short y, short val) {
 
 /* reduce the intensity of the pixel by 1 until it reaches 0 
  * for the entire framebuffer */
-void fade_buffer(unsigned char *buffer) {
+static inline void fade_buffer(unsigned char *buffer) {
 	int i = 0;
 	for (i = 0; i < NUM_PIXELS; i++) {
 		/* change the first nibble */
@@ -45,7 +40,7 @@ void fade_buffer(unsigned char *buffer) {
 }
 
 /* clear the entire buffer */
-void clear_buffer(unsigned char *buffer) {
+static inline void clear_buffer(unsigned char *buffer) {
 	int i = 0;
 	for (i = 0; i < NUM_PIXELS; i++) {
 		buffer[i]=0;

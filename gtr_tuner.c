@@ -12,7 +12,6 @@
 #include "driverlib/debug.h"
 #include "driverlib/interrupt.h"
 #include "driverlib/timer.h"
-#include "driverlib/pwm.h"
 #include "driverlib/gpio.h"
 #include "driverlib/uart.h"
 #include "driverlib/adc.h"
@@ -20,24 +19,53 @@
 #include "drivers/rit128x96x4.h"
 #include "utils/ustdlib.h"
 
+/* project parameters */
+#define POWER	5
+
+#define WIDTH	128/3
+#define HEIGHT	80
+#define NUM_PIXELS  (WIDTH*HEIGHT/2)
+
+#define FPS				10
+#define SAMPLING_FREQ	8820/2
+
 #include "queue.c"
 #include "graphics.c"
+#include "fft.c"
 
-char buffer[21];
+short int fft[(1<<POWER)];	/* fft buffer */
 int enabled = 0;
+char buffer[21];		/* char buffer for usprintf */
+struct queue data;		/* the global circular buffer */
+unsigned char framebuffer[NUM_PIXELS];	/* 128 x 80 pixels with 4 bits per pixel */
 
-/* 128 x 96 pixels but only 4 bits per pixel */
-unsigned char framebuffer[128 * 96 / 2];
+/* calculate a moving average of the data,
+ * this will give us the 0 value */
+unsigned int average = 0;
+unsigned int total = 0;
+unsigned int count = 0;
+static inline void update_average(unsigned int next) {
+	count = count + 1;
+	total = total + next;
 
-/* the global circular buffer */
-struct queue data;
-
-void display_data() {
-	int i = 0;
-	for (i = 0; i < 128; i++) {
-		short y = data.buffer[i] / 16;
-		set_pixel(framebuffer, i, y, 0xf);
+	/* overflow condition */
+	if (count == 0) {
+		count = 1;
+		total = 0;
 	}
+	
+	average = total/count;
+}
+
+/* display data */
+static inline void display_data() {
+	int x = 0;
+	for (x = 0; x < WIDTH; x++) {
+		unsigned int d = data.buffer[x];
+		short y = HEIGHT - ((d + 512-average) / 16);
+		set_pixel(framebuffer, x, y, 0xf);
+	}
+
 }
 
 void GPIOPortFIntHandler(void) {
@@ -50,8 +78,9 @@ void GPIOPortFIntHandler(void) {
 /* the timer handler inputs the sample and places it into
  * the circular buffer */
 void Timer0IntHandler(void) {
-	unsigned long value[1];
 	TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+	IntMasterDisable();
+	unsigned long value[1];
 
 	/* begin the ADC conversion */
 	ADCProcessorTrigger(ADC0_BASE, 3);
@@ -63,19 +92,28 @@ void Timer0IntHandler(void) {
 	/* add value to the circular buffer */
 	unsigned long val = value[0];
 	enqueue(&data, val);
+
+	/* use current value and calculate average */
+	update_average(val);
+
+	IntMasterEnable();
 }
 
 /* draw the frame */
 void Timer1IntHandler(void) {
-	fade_buffer(framebuffer);
-	display_data();
 	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
-	RIT128x96x4ImageDraw(framebuffer, 0, 0, 128, 96);
+	clear_buffer(framebuffer);
+	display_data();
+	RIT128x96x4ImageDraw(framebuffer, 0, 0, WIDTH, HEIGHT);
+
+	usprintf(buffer, "%03u", average);
+	RIT128x96x4StringDraw(buffer,0,HEIGHT,0xf);
+	//do_fft(data.buffer, fft);
 }
 
 void init(void) {
 	/* set up clocks */
-	SysCtlClockSet(SYSCTL_SYSDIV_1 | SYSCTL_USE_OSC | SYSCTL_OSC_MAIN | SYSCTL_XTAL_8MHZ);
+	SysCtlClockSet(SYSCTL_SYSDIV_1 | SYSCTL_USE_PLL | SYSCTL_OSC_INT | SYSCTL_XTAL_16MHZ);
 	
 	/* set up display */
 	RIT128x96x4Init(1000000);
@@ -95,8 +133,8 @@ void init(void) {
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
 	TimerConfigure(TIMER0_BASE, TIMER_CFG_32_BIT_PER);
 	TimerConfigure(TIMER1_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER0_BASE, TIMER_A, sysclk/4410);	/* Fs = 4410 */
-	TimerLoadSet(TIMER1_BASE, TIMER_A, sysclk/15);		/* 15 fps */
+	TimerLoadSet(TIMER0_BASE, TIMER_A, sysclk/SAMPLING_FREQ);
+	TimerLoadSet(TIMER1_BASE, TIMER_A, sysclk/FPS);
 	TimerEnable(TIMER0_BASE, TIMER_A);
 	TimerEnable(TIMER1_BASE, TIMER_A);
 	TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
