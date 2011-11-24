@@ -20,14 +20,14 @@
 #include "utils/ustdlib.h"
 
 /* project parameters */
-#define POWER	5
+#define POWER	7
 
-#define WIDTH	128/3
+#define WIDTH	128
 #define HEIGHT	80
 #define NUM_PIXELS  (WIDTH*HEIGHT/2)
 
 #define FPS				10
-#define SAMPLING_FREQ	8820/2
+#define SAMPLING_FREQ	8820
 
 #include "queue.c"
 #include "graphics.c"
@@ -38,6 +38,7 @@ int enabled = 0;
 char buffer[21];		/* char buffer for usprintf */
 struct queue data;		/* the global circular buffer */
 unsigned char framebuffer[NUM_PIXELS];	/* 128 x 80 pixels with 4 bits per pixel */
+int ready = 0;
 
 /* calculate a moving average of the data,
  * this will give us the 0 value */
@@ -106,14 +107,14 @@ void Timer1IntHandler(void) {
 	display_data();
 	RIT128x96x4ImageDraw(framebuffer, 0, 0, WIDTH, HEIGHT);
 
-	usprintf(buffer, "%03u", average);
+	usprintf(buffer, "%03u %04u", average, count);
 	RIT128x96x4StringDraw(buffer,0,HEIGHT,0xf);
-	//do_fft(data.buffer, fft);
+	ready = 1;
 }
 
 void init(void) {
 	/* set up clocks */
-	SysCtlClockSet(SYSCTL_SYSDIV_1 | SYSCTL_USE_PLL | SYSCTL_OSC_INT | SYSCTL_XTAL_16MHZ);
+	SysCtlClockSet(SYSCTL_SYSDIV_1 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_8MHZ);
 	
 	/* set up display */
 	RIT128x96x4Init(1000000);
@@ -136,10 +137,11 @@ void init(void) {
 	TimerLoadSet(TIMER0_BASE, TIMER_A, sysclk/SAMPLING_FREQ);
 	TimerLoadSet(TIMER1_BASE, TIMER_A, sysclk/FPS);
 	TimerEnable(TIMER0_BASE, TIMER_A);
-	TimerEnable(TIMER1_BASE, TIMER_A);
 	TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
-	TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
 	IntEnable(INT_TIMER0A);
+
+	TimerEnable(TIMER1_BASE, TIMER_A);
+	TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
 	IntEnable(INT_TIMER1A);
 
 	/* set up adc */
@@ -162,6 +164,11 @@ int main(void) {
 	init_queue(&data);
 
 	/* infinite loop */
-	while(1) { ;; }
+	while(1) {
+		if (ready) {
+			do_fft(data.buffer, fft);
+			ready = 0;
+		}
+	}
 }
 
