@@ -2,6 +2,8 @@
  * Written by Chris J Arges <christopherarges@gmail.com>
  */
 
+#include "project.h"
+
 /* a circular queue implementation */
 #define SIZE	(1<<POWER)
 #define MAX	SIZE-1
@@ -24,7 +26,7 @@ static inline void print_queue(struct queue *q) {
 #endif
 
 /* initialize a pointer a new queue */
-static inline void init_queue(struct queue *q) {
+void init_queue(struct queue *q) {
 	int i = 0;
 	q->head = 0;
 	q->tail = MAX;
@@ -34,7 +36,7 @@ static inline void init_queue(struct queue *q) {
 }
 
 /* increment and wrap */
-static inline int inc(int i) {
+int inc(int i) {
 	return ((i+1) % SIZE);
 }
 
@@ -61,5 +63,4 @@ int dequeue(struct queue *q) {
 	/* return the new data */
 	return data;
 }
-
 

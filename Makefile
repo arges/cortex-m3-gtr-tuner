@@ -28,6 +28,8 @@ BOARD=ek-lm3s8962
 PART=LM3S8962
 ROOT=/home/arges/Source/StellarisWare
 
+VERBOSE=
+
 include ${ROOT}/makedefs
 VPATH=${ROOT}/boards/${BOARD}/drivers
 VPATH+=${ROOT}/utils
@@ -42,15 +44,16 @@ clean:
 
 ${COMPILER}:
 	@mkdir ${COMPILER}
+
 #
 # Rules for building the program.
 #
-${COMPILER}/gtr_tuner.axf: ${COMPILER}/gtr_tuner.o
-${COMPILER}/gtr_tuner.axf: ${COMPILER}/rit128x96x4.o
-${COMPILER}/gtr_tuner.axf: ${COMPILER}/startup_${COMPILER}.o
-${COMPILER}/gtr_tuner.axf: ${COMPILER}/ustdlib.o
+${COMPILER}/gtr_tuner.axf: ${COMPILER}/graphics.o ${COMPILER}/queue.o
+${COMPILER}/gtr_tuner.axf: ${COMPILER}/gtr_tuner.o ${COMPILER}/rit128x96x4.o
+${COMPILER}/gtr_tuner.axf: ${COMPILER}/startup_${COMPILER}.o ${COMPILER}/ustdlib.o
 ${COMPILER}/gtr_tuner.axf: ${ROOT}/driverlib/${COMPILER}/libdriver.a
-${COMPILER}/gtr_tuner.axf: gtr_tuner.ld
+
+
 SCATTERgcc_gtr_tuner=gtr_tuner.ld
 ENTRY_gtr_tuner=ResetISR
 
