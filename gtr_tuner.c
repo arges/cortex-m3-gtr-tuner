@@ -46,7 +46,7 @@ enum {
 int state=TUNER;		/* put into starting mode */
 struct queue data;		/* the global circular buffer */
 char buffer[21];		/* char buffer for usprintf */
-
+int fade = 0;
 enum inputs {
 	UP = 14,
 	DOWN = 13,
@@ -56,6 +56,7 @@ enum inputs {
 
 /* 128 x 80 pixels with 4 bits per pixel */
 unsigned char framebuffer[NUM_PIXELS];
+unsigned int sysclk;
 
 /* calculate a moving average of the data,
  * this will give us the 0 value */
@@ -107,21 +108,38 @@ static inline void reset_stats() {
 }
 
 /* display guitar tuner */
-static inline void display_tuner() {
+static inline void display_tuner()
+{
 	int x = 0;
 	int y = 0;
 
 	/* draw middle line */
 	for (y = 0; y < 32; y++) {
-		set_pixel(framebuffer, WIDTH/2, y+16, 0x9);
+		set_pixel(framebuffer, WIDTH / 2, y + 16, 0x9);
 	}
 
 	/* draw tuning line */
-	if ((max-min) > DIFF_THRESHOLD ) {
-		x = (WIDTH/2) + ((zeros-guitar_zeros[string])*4);
+	if ((max - min) > DIFF_THRESHOLD) {
+		x = (WIDTH / 2) + ((zeros - guitar_zeros[string]) * 4);
 		for (y = 0; y < 16; y++) {
-			set_pixel(framebuffer, x, y+24, 0xf);
-			set_pixel(framebuffer, x+1, y+24, 0xf);
+			set_pixel(framebuffer, x, y + 24, 0xf);
+			set_pixel(framebuffer, x + 1, y + 24, 0xf);
+		}
+
+		/* show high/low arrow */
+		int offset = (zeros - guitar_zeros[string]);
+		if (offset > 0) {
+			set_pixel(framebuffer, WIDTH - 3, 32 - 2, 0xf);
+			set_pixel(framebuffer, WIDTH - 2, 32 - 1, 0xf);
+			set_pixel(framebuffer, WIDTH - 1, 32, 0xf);
+			set_pixel(framebuffer, WIDTH - 2, 32 + 1, 0xf);
+			set_pixel(framebuffer, WIDTH - 3, 32 + 2, 0xf);
+		} else if (offset < 0) {
+			set_pixel(framebuffer, 2, 32 - 2, 0xf);
+			set_pixel(framebuffer, 1, 32 - 1, 0xf);
+			set_pixel(framebuffer, 0, 32, 0xf);
+			set_pixel(framebuffer, 1, 32 + 1, 0xf);
+			set_pixel(framebuffer, 2, 32 + 2, 0xf);
 		}
 	}
 }
@@ -155,6 +173,10 @@ void GPIOPortEIntHandler(void)
 					    | GPIO_PIN_3));
 
 	switch (ulData) {
+	case UP:
+		fade = 1; break;
+	case DOWN:
+		fade = 0; break;
 	case LEFT:
 		string = (string + 5) % 6;
 		break;
@@ -188,16 +210,21 @@ void Timer1IntHandler(void) {
 	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
 
 	/* clear the frame */
-	clear_buffer(framebuffer);
+	if (fade)
+		fade_buffer(framebuffer);
+	else
+		clear_buffer(framebuffer);
 
 	/* draw different things depending on mode */
 	switch(state) {
 		case WAVEFORM: {
+			TimerLoadSet(TIMER1_BASE, TIMER_A, sysclk / 20);
 			display_waveform();
-			usprintf(buffer, "wave: %04u %04u", zeros, max-min);
+			usprintf(buffer, "wave: %04u %04u       ", zeros, max-min);
 			break;
 		}
 		case TUNER: {
+			TimerLoadSet(TIMER1_BASE, TIMER_A, sysclk / 5);
 			display_tuner();
 			usprintf(buffer, "TUNER %s %03u", guitar_strings[string], zeros);
 		}
@@ -218,7 +245,7 @@ void init(void)
 	/* set up clocks */
 	SysCtlClockSet(SYSCTL_SYSDIV_1 | SYSCTL_USE_PLL | SYSCTL_OSC_INT |
 		       SYSCTL_XTAL_8MHZ);
-	unsigned int sysclk = SysCtlClockGet();
+	sysclk = SysCtlClockGet();
 
 	/* set up display */
 	RIT128x96x4Init(1000000);
