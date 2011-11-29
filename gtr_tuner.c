@@ -40,8 +40,8 @@ char guitar_strings[6][21] = {
 int guitar_zeros[6] = { 115, 154, 204, 183, 229, 154 };
 
 enum {
-	WAVEFORM,
-	TUNER,
+	WAVEFORM=0,
+	TUNER=1,
 };
 int state=TUNER;		/* put into starting mode */
 struct queue data;		/* the global circular buffer */
@@ -141,7 +141,7 @@ void GPIOPortFIntHandler(void) {
 	GPIOPinIntClear(GPIO_PORTF_BASE, GPIO_PIN_1);
 	IntMasterDisable();
 	/* cycle through states */
-	state = (state + 1) % 3;
+	state = (state + 1) % 2;
 	IntMasterEnable();
 }
 
