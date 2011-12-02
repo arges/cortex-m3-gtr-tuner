@@ -39,9 +39,11 @@ char guitar_strings[6][21] = {
 };
 int guitar_zeros[6] = { 115, 154, 204, 183, 229, 154 };
 
+#define NUM_STATES 3
 enum {
 	WAVEFORM=0,
 	TUNER=1,
+	FFT=2,
 };
 int state=TUNER;		/* put into starting mode */
 struct queue data;		/* the global circular buffer */
@@ -154,12 +156,50 @@ static inline void display_waveform() {
 	}
 }
 
+/* FFT code */
+extern void Window16to32b_real(int *x,unsigned short *w,int N);
+extern void FFT128Real_32b(int *y, int *x);
+extern void magnitude32_32bIn(int *x,int M);
+extern int Hamming128_16b[];
+unsigned short w[SIZE/2]; //RAM based windowing coefficients
+int x[SIZE];
+int y[SIZE+2];
+int fft_max = 0;
+
+static inline void do_fft() {
+	int max = 0;
+	fft_max = 0;
+	int i;
+	for (i = 0; i < SIZE; i++) {
+		x[i] = data.buffer[i] - average;
+	}
+	Window16to32b_real(x, w, SIZE); 
+	FFT128Real_32b(y, x);
+	magnitude32_32bIn(&y[2], SIZE/2-1);
+	for (i = 1; i < SIZE; i++) {
+		if (max < y[i]) {
+			max = y[i];
+			fft_max = i;
+		}
+	}
+}
+
+/* display fft data */
+static inline void display_fft() {
+	int x = 0;
+	for (x = 0; x < SIZE; x++) {
+		unsigned int d = y[x];
+		short y = HEIGHT - (d / 50000);	/* scale for display */
+		set_pixel(framebuffer, x, y, 0xf);
+	}
+}
+
 /* handle button presses */
 void GPIOPortFIntHandler(void) {
 	GPIOPinIntClear(GPIO_PORTF_BASE, GPIO_PIN_1);
 	IntMasterDisable();
 	/* cycle through states */
-	state = (state + 1) % 2;
+	state = (state + 1) % NUM_STATES;
 	IntMasterEnable();
 }
 
@@ -226,7 +266,15 @@ void Timer1IntHandler(void) {
 		case TUNER: {
 			TimerLoadSet(TIMER1_BASE, TIMER_A, sysclk / 5);
 			display_tuner();
-			usprintf(buffer, "TUNER %s %03u", guitar_strings[string], zeros);
+			usprintf(buffer, "TUNER %s %03u          ", guitar_strings[string], zeros);
+			break;
+		}
+		case FFT: {
+			TimerLoadSet(TIMER1_BASE, TIMER_A, sysclk / 20);
+			do_fft();
+			display_fft();
+			usprintf(buffer, "FFT %04u %04u            ", count, fft_max);
+			break;
 		}
 	}
 
@@ -302,6 +350,11 @@ void init(void)
 
 	/* init the data queue */
 	init_queue(&data);
+
+	/* put window in ram */
+	int i;
+	for (i=0;i<SIZE/2;i++)
+		w[i] = Hamming128_16b[i];
 
 	/* enable interrupts */
 	IntMasterEnable();

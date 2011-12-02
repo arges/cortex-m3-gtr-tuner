@@ -52,7 +52,9 @@ ${COMPILER}/gtr_tuner.axf: ${COMPILER}/graphics.o ${COMPILER}/queue.o
 ${COMPILER}/gtr_tuner.axf: ${COMPILER}/gtr_tuner.o ${COMPILER}/rit128x96x4.o
 ${COMPILER}/gtr_tuner.axf: ${COMPILER}/startup_${COMPILER}.o ${COMPILER}/ustdlib.o
 ${COMPILER}/gtr_tuner.axf: ${ROOT}/driverlib/${COMPILER}/libdriver.a
-
+${COMPILER}/gtr_tuner.axf: ${COMPILER}/Eg_FFT128Real_32b.o
+${COMPILER}/gtr_tuner.axf: ${COMPILER}/Eg_Magnitude.o
+${COMPILER}/gtr_tuner.axf: ${COMPILER}/Eg_Window16to32b_real.o
 
 SCATTERgcc_gtr_tuner=gtr_tuner.ld
 ENTRY_gtr_tuner=ResetISR
