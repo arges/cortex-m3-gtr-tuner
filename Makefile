@@ -26,7 +26,7 @@ NAME=gtr_tuner
 
 BOARD=ek-lm3s8962
 PART=LM3S8962
-ROOT=/home/arges/Source/StellarisWare
+ROOT=/opt/StellarisWare
 
 VERBOSE=
 
